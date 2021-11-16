@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Linked Text &amp; Stickies</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta data-hid="description" name="description" content="">
+    <meta name="format-detection" content="telephone=no">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"
+        integrity="sha512-WFN04846sdKMIP5LKNphMaWzU7YpMyCU245etK3g/2ARYbPK9Ub18eG+ljU96qKRCWh+quCY7yefSmlkQw1ANQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script data-hid="miro-sdk" src="https://miro.com/app/static/sdk.1.1.js"></script>
+</head>
+
+<body>
+    <script>
+        console.log("Linked Text & Stickies - v1.0.0");
+        const MIRO_APP_ID = "3074457367770533510";
+        let lastEditedWidgetIds = [];
+
+        const svgIcon = `<svg width="100%" height="100%" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <path d="M4,2C2.903,2 2,2.903 2,4L2,20C2,21.097 2.903,22 4,22L14.172,22C14.702,22 15.211,21.789 15.586,21.414L21.414,15.586C21.789,15.211 22,14.701 22,14.17L22,4C22,2.903 21.097,2 20,2L4,2ZM4,20L4,4L20,4L20,14L16,14C14.903,14 14,14.903 14,16L14,20L4,20Z" style="fill:rgb(5,0,56);"/>
+    <path d="M15.144,13.209C15.016,13.337 14.842,13.409 14.66,13.409C14.285,13.409 13.976,13.101 13.976,12.725C13.976,12.544 14.048,12.37 14.177,12.241L16.837,9.581C17.371,9.047 17.129,7.939 16.595,7.404C16.061,6.871 14.953,6.629 14.419,7.163L11.758,9.823C11.629,9.957 11.451,10.032 11.266,10.032C10.891,10.032 10.582,9.723 10.582,9.348C10.582,9.163 10.657,8.985 10.791,8.856L13.452,6.195C14.519,5.127 16.494,5.369 17.563,6.437C18.631,7.506 18.873,9.48 17.804,10.548L15.144,13.209Z" style="fill:rgb(5,0,56);fill-rule:nonzero;"/>
+    <path d="M13.934,9.097C14.063,8.969 14.237,8.897 14.418,8.897C14.794,8.897 15.103,9.206 15.103,9.581C15.103,9.763 15.031,9.937 14.902,10.065L10.066,14.901C9.937,15.03 9.763,15.102 9.582,15.102C9.206,15.102 8.897,14.793 8.897,14.418C8.897,14.237 8.969,14.063 9.098,13.934L13.934,9.098L13.934,9.097Z" style="fill:rgb(5,0,56);fill-rule:nonzero;"/>
+    <path d="M9.581,11.033C9.316,10.767 8.879,10.767 8.614,11.033L6.196,13.45C5.127,14.518 5.369,16.493 6.437,17.561C7.506,18.63 9.481,18.872 10.548,17.803L12.967,15.385C13.086,15.258 13.152,15.091 13.152,14.917C13.152,14.542 12.844,14.233 12.468,14.233C12.294,14.233 12.127,14.299 12,14.419L9.581,16.836C9.048,17.37 7.94,17.129 7.405,16.594C6.871,16.06 6.629,14.952 7.163,14.418L9.581,12C9.846,11.734 9.846,11.298 9.581,11.033Z" style="fill:rgb(5,0,56);fill-rule:nonzero;"/>
+</svg>
+`;
+
+        function getBackgroundColorProperty(widget) {
+            return widget.type === "STICKER" ? "stickerBackgroundColor" : "backgroundColor";
+        }
+
+        async function updateLinkedText(widgetId) {
+            if (!widgetId) return;
+
+            // Get widget
+            let widget = await miro.board.widgets.get({ id: widgetId });
+            if (widget.length < 1) return;
+            widget = widget[0];
+
+            // Check type
+            if (["STICKER", "TEXT", "SHAPE"].indexOf(widget.type) < 0) return;
+
+            // Check linkid
+            const linkid = _.get(widget, `metadata[${MIRO_APP_ID}].linkid`, null);
+            if (!linkid) return;
+
+            // Get all widgets with linkid and update text
+            const text = widget.text;
+            const backgroundColor = widget.style[getBackgroundColorProperty(widget)];
+            const widgets = await miro.board.widgets.get({ metadata: { [MIRO_APP_ID]: { linkid } } });
+            widgets.forEach(w => {
+                w.style[getBackgroundColorProperty(w)] = backgroundColor;
+                w.text = widget.text;
+            });
+            await miro.board.widgets.update(widgets);
+        }
+
+        miro.onReady(async function () {
+            miro.initialize({
+                extensionPoints: {
+                    bottomBar: {
+                        title: "Link",
+                        svgIcon,
+                        onClick: async () => {
+                            if (!await miro.isAuthorized()) {
+                                await miro.requestAuthorization();
+                            }
+                            const widgets = await miro.board.getSelection();
+                            if (widgets.length === 0) {
+                                miro.showErrorNotification("Select two or more elements to link, or select one element to unlink.")
+                                return;
+                            }
+                            const linkid = Date.now();
+                            const text = _.uniq(widgets.map(w => w.text)).join("\n");
+                            const backgroundColor = widgets[0].style[getBackgroundColorProperty(widgets[0])];
+                            widgets.forEach((widget, index) => {
+                                widget.metadata[MIRO_APP_ID] = { linkid }
+                                widget.text = text;
+                                widget.style[getBackgroundColorProperty(w)] = backgroundColor;
+                            });
+                            await miro.board.widgets.update(widgets);
+                            if (widgets.length === 1) {
+                                miro.showNotification("Unlinked element")
+                            } else {
+                                miro.showNotification(`Linked ${widgets.length} elements`);
+                            }
+                        },
+                    },
+                },
+            });
+            miro.addListener("SELECTION_UPDATED", async e => {
+                lastEditedWidgetIds.map(updateLinkedText);
+                lastEditedWidgetIds = _(e.data)
+                    .map(w => ({
+                        id: w.id,
+                        linkid: _.get(w, `metadata[${MIRO_APP_ID}].linkid`, null)
+                    }))
+                    .filter(t => t.linkid)
+                    .groupBy("linkid")
+                    .mapValues(ids => ids[0])
+                    .values()
+                    .map("id")
+                    .value();
+            });
+        });
+    </script>
+    <h1>Miro Linked Text &amp; Stickies</h1>
+    <p>
+        <a href="https://github.com/markmarijnissen/miro-linked-text">Read more</a>
+    </p>
+</body>
+
+</html>
