@@ -15,7 +15,7 @@
 
 <body>
     <script>
-        console.log("Linked Text & Stickies - v1.0.0");
+        console.log("Linked Text & Stickies - v1.0.1");
         const MIRO_APP_ID = "3074457367770533510";
         let lastEditedWidgetIds = [];
 
@@ -91,22 +91,24 @@
                 },
             });
             miro.addListener("SELECTION_UPDATED", async e => {
-                lastEditedWidgetIds.map(updateLinkedText);
-                lastEditedWidgetIds = _(e.data)
-                    .map(w => ({
-                        id: w.id,
-                        linkid: _.get(w, `metadata[${MIRO_APP_ID}].linkid`, null)
-                    }))
-                    .filter(t => t.linkid)
-                    .groupBy("linkid")
-                    .mapValues(ids => ids[0])
-                    .values()
-                    .map("id")
-                    .value();
+                if (await miro.isAuthorized()) {
+                    lastEditedWidgetIds.map(updateLinkedText);
+                    lastEditedWidgetIds = _(e.data)
+                        .map(w => ({
+                            id: w.id,
+                            linkid: _.get(w, `metadata[${MIRO_APP_ID}].linkid`, null)
+                        }))
+                        .filter(t => t.linkid)
+                        .groupBy("linkid")
+                        .mapValues(ids => ids[0])
+                        .values()
+                        .map("id")
+                        .value();
+                }
             });
         });
     </script>
-    <h1>Miro Linked Text &amp; Stickies</h1>
+    <h1>Miro Linked Text &amp; Stickies - v1.0.1</h1>
     <p>
         <a href="https://github.com/markmarijnissen/miro-linked-text">Read more</a>
     </p>
