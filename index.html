@@ -15,7 +15,7 @@
 
 <body>
     <script>
-        console.log("Linked Text & Stickies - v1.0.1");
+        console.log("Linked Text & Stickies - v1.0.2");
         const MIRO_APP_ID = "3074457367770533510";
         let lastEditedWidgetIds = [];
 
@@ -78,7 +78,7 @@
                             widgets.forEach((widget, index) => {
                                 widget.metadata[MIRO_APP_ID] = { linkid }
                                 widget.text = text;
-                                widget.style[getBackgroundColorProperty(w)] = backgroundColor;
+                                widget.style[getBackgroundColorProperty(widget)] = backgroundColor;
                             });
                             await miro.board.widgets.update(widgets);
                             if (widgets.length === 1) {
@@ -108,7 +108,7 @@
             });
         });
     </script>
-    <h1>Miro Linked Text &amp; Stickies - v1.0.1</h1>
+    <h1>Miro Linked Text &amp; Stickies</h1>
     <p>
         <a href="https://github.com/markmarijnissen/miro-linked-text">Read more</a>
     </p>
